@@ -1,5 +1,144 @@
 ﻿
-#if UNITY_STANDALONE || UNITY_SWITCH || UNITY_GAMECORE || UNITY_PS4 || UNITY_PS5 || UNITY_ANDROID || UNITY_IOS || (MODIO_COMPILE_ALL && UNITY_EDITOR) || UNITY_WSA || !UNITY_2019_4_OR_NEWER
+#if UNITY_WEBGL // using NativeWebSocket
+using System;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using ModIO.Implementation.Wss.Messages;
+using Newtonsoft.Json;
+using NativeWebSocket;
+
+namespace ModIO.Implementation.Wss
+{
+	internal class SocketConnection : ISocketConnection
+	{
+		WebSocket webSocket;
+		readonly Mutex _sending = new Mutex();
+
+		Action<WssMessages> Receive { get; set; }
+		Action Disconnect { get; set; }
+		bool closingConnection = false;
+		public bool Connected() => webSocket?.State == WebSocketState.Open;
+
+		public async Task<Result> SetupConnection(string url, Action<WssMessages> onReceive, Action onDisconnect)
+		{
+			Logger.Log(LogLevel.Error, $"[Socket] Setting up connection for WebSocket ({url})");
+			
+			// Check if we are already connected
+			if(Connected())
+			{
+				return ResultBuilder.Success;
+			}
+			
+			webSocket = new WebSocket(url);
+			// webSocket.Options.UseDefaultCredentials = true;
+			// webSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+
+			try
+			{
+				// var uri = new Uri(url);
+				await webSocket.Connect();
+			}
+			catch(Exception e)
+			{
+				Logger.Log(LogLevel.Error, $"[Socket] Failed to connect WSS Gateway."
+				                           + $"\nException: {e.Message}");
+				return ResultBuilder.Create(ResultCode.WSS_NotConnected);
+			}
+			
+			Logger.Log(LogLevel.Verbose, $"[Socket] WSS Gateway connected");
+
+			Receive = onReceive;
+			Disconnect = onDisconnect;
+			ReceiveMessages();
+			
+			return ResultBuilder.Success;
+		}
+
+		public async Task CloseConnection()
+		{
+			if (Connected())
+			{
+				try
+				{
+					closingConnection = true;
+					await webSocket.Close();
+					// webSocket.Dispose();
+					webSocket.OnClose += e => Disconnect?.Invoke();
+					webSocket.OnMessage += e => 
+						Receive?.Invoke(JsonConvert.DeserializeObject<WssMessages>(Encoding.UTF8.GetString(e)));
+				}
+				catch(Exception e)
+				{
+					Logger.Log(LogLevel.Error, $"[Socket] Failed to close the WebSocket connection. Exception: {e.Message}");
+				}
+				finally
+				{
+					closingConnection = false;
+					webSocket = null;
+					Logger.Log(LogLevel.Error, $"[Socket] CLOSED");
+				}
+			}
+		}
+
+		async void ReceiveMessages()
+		{
+			byte[] buffer = new byte[4096];
+
+			while(webSocket.State == WebSocketState.Open)
+			{
+				try {
+					#if !UNITY_WEBGL
+					await webSocket.Receive();
+					#endif
+					// Give roughly a frame of delay between receiving new messages
+					await Task.Delay(16);
+				}
+				catch(Exception e)
+				{
+					Logger.Log(LogLevel.Error, $"[Socket] Exception caught during SocketConnection.Receive."
+					                           // + $" Closing connection."
+					                           + $"\n{e.Message}\nStacktrace: {e.StackTrace}");
+					if(!closingConnection)
+					{
+						if(Connected())
+						{
+							await CloseConnection();
+						}
+						Disconnect?.Invoke();
+					}
+					break;
+				}
+			}
+		}
+
+		public async Task<Result> SendData(WssMessages message)
+		{
+			if(!Connected())
+			{
+				return ResultBuilder.Create(ResultCode.WSS_NotConnected);
+			}
+			
+			_sending.WaitOne();
+			try {
+				await webSocket.Send(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message)));
+			}
+			catch(Exception e)
+			{
+				Logger.Log(LogLevel.Error, $"[Socket] Failed to send data across the WSS Gateway."
+				                           + $"\nException: {e.Message}");
+				return ResultBuilder.Create(ResultCode.WSS_FailedToSend);
+			}
+			finally
+			{
+				_sending.ReleaseMutex();
+			}
+			
+			return ResultBuilder.Success;
+		}
+	}
+}
+#elif UNITY_EDITOR || UNITY_STANDALONE || UNITY_SWITCH || UNITY_GAMECORE || UNITY_PS4 || UNITY_PS5 || UNITY_ANDROID || UNITY_IOS || (MODIO_COMPILE_ALL && UNITY_EDITOR) || UNITY_WSA || !UNITY_2019_4_OR_NEWER
 using System;
 using System.Net.WebSockets;
 using System.Text;
