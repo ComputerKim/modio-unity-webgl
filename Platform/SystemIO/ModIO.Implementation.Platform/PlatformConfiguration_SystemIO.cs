@@ -1,4 +1,4 @@
-﻿#if (UNITY_STANDALONE || UNITY_ANDROID || UNITY_IOS || UNITY_WSA) && !UNITY_EDITOR
+﻿#if !UNITY_EDITOR
 
 using System.Threading.Tasks;
 
@@ -26,6 +26,9 @@ namespace ModIO.Implementation.Platform
 #elif UNITY_IOS
         /// <summary>Holds the value for the platform header value to use in requests.</summary>
         public static string RESTAPI_HEADER = RestApiPlatform.Ios.ToString();
+#else 
+        /// <summary>Holds the value for the platform header value to use in requests.</summary>
+        public static string RESTAPI_HEADER = RestApiPlatform.Source.ToString();
 #endif
         public const bool SynchronizedDataJobs = false;
 
