@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using ModIO.Implementation.API.Objects;
 using ModIO.Implementation.Platform;
 using Newtonsoft.Json;
+using System.Text;
+using UnityEngine;
+using UnityEngine.Networking;
 
 namespace ModIO.Implementation.API
 {
@@ -31,8 +34,7 @@ namespace ModIO.Implementation.API
             Result result = ResultBuilder.Success;
 
             // Build request
-            WebRequest request = null;
-            WebResponse response = default;
+            UnityWebRequest request = null;
 
             // Setup the handle
             handle.progress = progressHandle;
@@ -42,12 +44,10 @@ namespace ModIO.Implementation.API
                 request = BuildWebRequestForDownload(url);
                 handle.cancel = request.Abort;
 
-                response = await request.GetDownloadResponse(downloadTo, progressHandle);
+                await request.GetDownloadResponse(downloadTo, progressHandle);
             }
             catch(WebException e)
             {
-                response = e.Response;
-
                 if(e.Status == WebExceptionStatus.RequestCanceled)
                 {
                     // request?.LogRequestBeingAborted(config);
@@ -80,7 +80,7 @@ namespace ModIO.Implementation.API
             // Process response
             if (result.Succeeded())
             {
-                result = await ProcessDownloadResponse(request, response, url);
+                result = await ProcessDownloadResponse(request, url);
             }
             else
             {
@@ -114,8 +114,7 @@ namespace ModIO.Implementation.API
         public static async Task<ResultAnd<TResult>> Execute<TResult>(WebRequestConfig config, RequestHandle<ResultAnd<TResult>> handle, ProgressHandle progressHandle)
         {
             ResultAnd<TResult> result = default;
-            WebResponse response = null;
-            WebRequest request = null;
+            UnityWebRequest request = null;
 
             if(handle != null)
             {
@@ -128,7 +127,7 @@ namespace ModIO.Implementation.API
                     ? BuildWebRequestForUpload(config, progressHandle)
                     : await BuildWebRequest(config, progressHandle);
 
-                request.Timeout = config.ShouldRequestTimeout ? 30000 : -1;
+                request.timeout = config.ShouldRequestTimeout ? 30000 : -1;
 
                 if(handle != null)
                 {
@@ -137,9 +136,10 @@ namespace ModIO.Implementation.API
 
                 request.LogRequestBeingSent(config);
 
-                response = config.IsUpload
-                    ? await request.GetUploadResponse(config, progressHandle)
-                    : await request.GetResponseAsync();
+                if (config.IsUpload)
+                    await request.GetUploadResponse(config, progressHandle);
+                else
+                    await request.SendWebRequest();
             }
             catch(Exception e)
             {
@@ -150,17 +150,11 @@ namespace ModIO.Implementation.API
                 }
                 if(e is WebException exception)
                 {
-                    response = exception.Response;
-
                     if (exception.Status == WebExceptionStatus.RequestCanceled)
                     {
                         request?.LogRequestBeingAborted(config);
                         return ResultAnd.Create(ResultCode.Internal_OperationCancelled, default(TResult));
                     }
-                }
-                else
-                {
-                    response = default;
                 }
             }
 
@@ -179,7 +173,7 @@ namespace ModIO.Implementation.API
                 }
                 else
                 {
-                    result = await ProcessResponse<TResult>(request, response, config);
+                    result = await ProcessResponse<TResult>(request, config);
                 }
             }
             catch(Exception e)
@@ -211,7 +205,7 @@ namespace ModIO.Implementation.API
 
 
 #region Creating WebRequests
-        static void LogRequestBeingSent(this WebRequest request, WebRequestConfig config)
+        static void LogRequestBeingSent(this UnityWebRequest request, WebRequestConfig config)
         {
             string log = $"\n{config.Url}"
                          + $"\nMETHOD: {config.RequestMethodType}"
@@ -220,7 +214,7 @@ namespace ModIO.Implementation.API
             Logger.Log(LogLevel.Verbose, $"SENDING{log}");
         }
 
-        static void LogRequestBeingAborted(this WebRequest request, WebRequestConfig config)
+        static void LogRequestBeingAborted(this UnityWebRequest request, WebRequestConfig config)
         {
             string log = $"\n{config.Url}"
                          + $"\nMETHOD: {config.RequestMethodType}"
@@ -229,52 +223,52 @@ namespace ModIO.Implementation.API
             Logger.Log(LogLevel.Verbose, $"ABORTED{log}");
         }
 
-        static async Task<Result> ProcessDownloadResponse(WebRequest request, WebResponse response, string url)
+        static async Task<Result> ProcessDownloadResponse(UnityWebRequest request, string url)
         {
             Result finalResult = ResultBuilder.Unknown;
 
-            int statusCode = response == null ? 0 : (int)((HttpWebResponse)response).StatusCode;
+            int statusCode = (int)request.responseCode;
 
             Stream stream = null;
 
-            if (response != null)
+            if (request.downloadHandler.data != null)
             {
-                stream = response.GetResponseStream();
+                stream = new MemoryStream(request.downloadHandler.data);
             }
 
             string completeRequestLog = $"{GenerateLogForStatusCode(statusCode)}"
                                         + $"\n{url}"
                                         + $"\nMETHOD: GET"
                                         + $"\n{GenerateLogForRequestMessage(request)}"
-                                        + $"\n{GenerateLogForResponseMessage(response)}";
+                                        + $"\n{GenerateLogForResponseMessage(request)}";
 
             if(IsSuccessStatusCode(statusCode))
             {
                 finalResult = ResultBuilder.Success;
                 Logger.Log(LogLevel.Verbose, $"DOWNLOAD SUCCEEDED {completeRequestLog}");
             }
-            else
+            else 
             {
                 finalResult = await HttpStatusCodeError(stream, completeRequestLog, statusCode);
                 Logger.Log(LogLevel.Verbose, $"DOWNLOAD FAILED [{completeRequestLog}]");
             }
 
             stream?.Dispose();
-            response?.Close();
+            // response?.Close();
             return finalResult;
         }
 
-        static async Task<ResultAnd<TResult>> ProcessResponse<TResult>(WebRequest request, WebResponse response, WebRequestConfig config)
+        static async Task<ResultAnd<TResult>> ProcessResponse<TResult>(UnityWebRequest request, WebRequestConfig config)
         {
             ResultAnd<TResult> finalResult = default;
 
-            int statusCode = response == null ? 0 : (int)((HttpWebResponse)response).StatusCode;
+            int statusCode = (int)request.responseCode;
             Stream stream = null;
 
             // Dont get the stream if there is no content
-            if (response != null && statusCode != 204)
+            if (request.downloadHandler?.data != null && statusCode != 204)
             {
-                stream = response.GetResponseStream();
+                stream = new MemoryStream(request.downloadHandler.data);
             }
 
             string completeRequestLog = $"{GenerateLogForStatusCode(statusCode)}"
@@ -282,7 +276,7 @@ namespace ModIO.Implementation.API
                                         + $"\nMETHOD: {config.RequestMethodType}"
                                         + $"\n{GenerateLogForRequestMessage(request)}"
                                         + $"\n{GenerateLogForWebRequestConfig(config)}"
-                                        + $"\n{GenerateLogForResponseMessage(response)}";
+                                        + $"\n{GenerateLogForResponseMessage(request)}";
 
             if(IsSuccessStatusCode(statusCode))
             {
@@ -296,77 +290,74 @@ namespace ModIO.Implementation.API
             }
 
             stream?.Dispose();
-            response?.Close();
+            // response?.Close();
             return finalResult;
         }
 
         static bool IsSuccessStatusCode(int code) => code >= 200 && code < 300;
 
-        static async Task<WebResponse> GetDownloadResponse(this WebRequest request, Stream downloadStream, ProgressHandle progressHandle)
+        static async Task GetDownloadResponse(this UnityWebRequest request, Stream downloadStream, ProgressHandle progressHandle)
         {
             // Send request
-            WebResponse response = await request.GetResponseAsync();
+            await request.SendWebRequest();
 
-            // Read response
-            using(Stream responseStream = response.GetResponseStream())
-            {
-                // Get the total size of the file to download
-                long totalSize = response.ContentLength;
-
-                // Create a buffer to read the response stream in chunks
-                byte[] buffer = new byte[4096];
-
-                // Initialize progress tracking
-                long bytesDownloaded = 0;
-                long bytesDownloadedForThisSample = 0;
-                int bytesRead = 0;
-                Stopwatch progressMeasure = new Stopwatch();
-                Stopwatch yieldMeasure = new Stopwatch();
-                progressMeasure.Start();
-                yieldMeasure.Start();
-
-                // Read the response stream in chunks and write to file
-                while((bytesRead = responseStream.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    downloadStream.Write(buffer, 0, bytesRead);
-                    bytesDownloaded += bytesRead;
-
-                    if(progressHandle != null)
-                    {
-                        bytesDownloadedForThisSample += bytesRead;
-                        if(progressMeasure.ElapsedMilliseconds >= 1000)
-                        {
-                            progressHandle.Progress = (float)((decimal)bytesDownloaded / totalSize);
-                            progressHandle.BytesPerSecond = (long)(bytesDownloadedForThisSample * (progressMeasure.ElapsedMilliseconds / 1000f));
-
-                            bytesDownloadedForThisSample = 0;
-                            progressMeasure.Restart();
-                        }
-                        if(yieldMeasure.ElapsedMilliseconds >= 16)
-                        {
-                            await Task.Yield();
-                            yieldMeasure.Restart();
-                        }
-                    }
-                }
-
-                progressMeasure.Stop();
-                yieldMeasure.Stop();
-            }
-            return response;
+            // // Read response
+            // using(Stream responseStream = response.GetResponseStream())
+            // {
+            //     // Get the total size of the file to download
+            //     long totalSize = response.ContentLength;
+            //
+            //     // Create a buffer to read the response stream in chunks
+            //     byte[] buffer = new byte[4096];
+            //
+            //     // Initialize progress tracking
+            //     long bytesDownloaded = 0;
+            //     long bytesDownloadedForThisSample = 0;
+            //     int bytesRead = 0;
+            //     Stopwatch progressMeasure = new Stopwatch();
+            //     Stopwatch yieldMeasure = new Stopwatch();
+            //     progressMeasure.Start();
+            //     yieldMeasure.Start();
+            //
+            //     // Read the response stream in chunks and write to file
+            //     while((bytesRead = responseStream.Read(buffer, 0, buffer.Length)) > 0)
+            //     {
+            //         downloadStream.Write(buffer, 0, bytesRead);
+            //         bytesDownloaded += bytesRead;
+            //
+            //         if(progressHandle != null)
+            //         {
+            //             bytesDownloadedForThisSample += bytesRead;
+            //             if(progressMeasure.ElapsedMilliseconds >= 1000)
+            //             {
+            //                 progressHandle.Progress = (float)((decimal)bytesDownloaded / totalSize);
+            //                 progressHandle.BytesPerSecond = (long)(bytesDownloadedForThisSample * (progressMeasure.ElapsedMilliseconds / 1000f));
+            //
+            //                 bytesDownloadedForThisSample = 0;
+            //                 progressMeasure.Restart();
+            //             }
+            //             if(yieldMeasure.ElapsedMilliseconds >= 16)
+            //             {
+            //                 await Task.Yield();
+            //                 yieldMeasure.Restart();
+            //             }
+            //         }
+            //     }
+            //
+            //     progressMeasure.Stop();
+            //     yieldMeasure.Stop();
+            // }
         }
 
-        static async Task<WebResponse> GetUploadResponse(this WebRequest request, WebRequestConfig config, ProgressHandle progressHandle)
+        static async Task GetUploadResponse(this UnityWebRequest request, WebRequestConfig config, ProgressHandle progressHandle)
         {
             // Send request
             await request.SetupMultipartRequest(config, progressHandle);
 
-            WebResponse response = await request.GetResponseAsync();
-
-            return response;
+            await request.SendWebRequest();
         }
 
-        static async Task<WebRequest> BuildWebRequest(WebRequestConfig config, ProgressHandle progressHandle)
+        static async Task<UnityWebRequest> BuildWebRequest(WebRequestConfig config, ProgressHandle progressHandle)
         {
             // Add API key or Access token
             if (UserData.instance.IsOAuthTokenValid() && !config.DontUseAuthToken)
@@ -380,8 +371,7 @@ namespace ModIO.Implementation.API
             }
 
             // Create request
-            HttpWebRequest request = WebRequest.Create(config.Url) as HttpWebRequest;
-            request.Method = config.RequestMethodType;
+            var request = new UnityWebRequest(config.Url, config.RequestMethodType);
             request.SetModioHeaders();
             request.SetConfigHeaders(config);
 
@@ -389,7 +379,7 @@ namespace ModIO.Implementation.API
             WebRequestManager.ShutdownEvent += request.Abort;
 
             // URL ENCODED REQUEST
-            request.ContentType = "application/x-www-form-urlencoded";
+            request.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 
             if(config.HasStringData)
             {
@@ -399,11 +389,10 @@ namespace ModIO.Implementation.API
             return request;
         }
 
-        static WebRequest BuildWebRequestForUpload(WebRequestConfig config, ProgressHandle progressHandle)
+        static UnityWebRequest BuildWebRequestForUpload(WebRequestConfig config, ProgressHandle progressHandle)
         {
             // Create request
-            HttpWebRequest request = WebRequest.Create(config.Url) as HttpWebRequest;
-            request.Method = config.RequestMethodType;
+            var request = new UnityWebRequest(config.Url, config.RequestMethodType);
             request.SetModioHeaders();
             request.SetConfigHeaders(config);
 
@@ -411,7 +400,7 @@ namespace ModIO.Implementation.API
             // TODO if we dont have an auth token we should abort early, all uploads require an auth token
             if (UserData.instance.IsOAuthTokenValid())
             {
-                request.Headers.Add("Authorization", $"Bearer {UserData.instance.oAuthToken}");
+                request.SetRequestHeader("Authorization", $"Bearer {UserData.instance.oAuthToken}");
             }
 
             // Add request to shutdown method
@@ -420,19 +409,18 @@ namespace ModIO.Implementation.API
             return request;
         }
 
-        static WebRequest BuildWebRequestForDownload(string url)
+        static UnityWebRequest BuildWebRequestForDownload(string url)
         {
 
             // Create request
-            HttpWebRequest request = WebRequest.Create(url) as HttpWebRequest;
-            request.Method = "GET";
+            var request = new UnityWebRequest(url, "GET");
             request.SetModioHeaders();
-            request.Timeout = -1;
+            request.timeout = -1;
 
             // Add API key or Access token
             if (UserData.instance.IsOAuthTokenValid())
             {
-                request.Headers.Add("Authorization", $"Bearer {UserData.instance.oAuthToken}");
+                request.SetRequestHeader("Authorization", $"Bearer {UserData.instance.oAuthToken}");
             }
 
             // Add request to shutdown method
@@ -441,28 +429,27 @@ namespace ModIO.Implementation.API
             return request;
         }
 
-        static void SetModioHeaders(this WebRequest webRequest)
+        static void SetModioHeaders(this UnityWebRequest request)
         {
             // Set default headers for all requests
-            HttpWebRequest request = (HttpWebRequest)webRequest;
-            request.Accept = "application/json";
-            request.UserAgent = $"unity-{UnityEngine.Application.unityVersion}-{ModIOVersion.Current.ToHeaderString()}";
+            request.SetRequestHeader("Accept", "application/json");
+            request.SetRequestHeader("User-Agent", $"unity-{Application.unityVersion}-{ModIOVersion.Current.ToHeaderString()}");
             // Cloudflare reuses open TCP connections for up to 15 minutes (900 seconds) after the last HTTP request
-            request.Connection = "true"; // is set to true by default
-            request.Headers.Add(ServerConstants.HeaderKeys.LANGUAGE, Settings.server.languageCode ?? "en");
-            request.Headers.Add(ServerConstants.HeaderKeys.PLATFORM, PlatformConfiguration.RESTAPI_HEADER);
-            request.Headers.Add(ServerConstants.HeaderKeys.PORTAL, ServerConstants.ConvertUserPortalToHeaderValue(Settings.build.userPortal));
+            request.SetRequestHeader("Connection", "keep-alive");
+            request.SetRequestHeader(ServerConstants.HeaderKeys.LANGUAGE, Settings.server.languageCode ?? "en");
+            request.SetRequestHeader(ServerConstants.HeaderKeys.PLATFORM, PlatformConfiguration.RESTAPI_HEADER);
+            request.SetRequestHeader(ServerConstants.HeaderKeys.PORTAL, ServerConstants.ConvertUserPortalToHeaderValue(Settings.build.userPortal));
         }
 
-        static void SetConfigHeaders(this WebRequest request, WebRequestConfig config)
+        static void SetConfigHeaders(this UnityWebRequest request, WebRequestConfig config)
         {
             foreach(var header in config.HeaderData)
             {
-                request.Headers.Add(header.Key, header.Value);
+                request.SetRequestHeader(header.Key, header.Value);
             }
         }
 
-        static async Task SetupUrlEncodedRequest(this WebRequest request, WebRequestConfig config)
+        static async Task SetupUrlEncodedRequest(this UnityWebRequest request, WebRequestConfig config)
         {
             string kvpData = "";
             foreach(var kvp in config.StringKvpData)
@@ -471,20 +458,20 @@ namespace ModIO.Implementation.API
             }
             kvpData = kvpData.Trim('&');
 
-            using (Stream requestStream = request.GetRequestStream())
-            {
-                using(StreamWriter writer = new StreamWriter(requestStream))
-                {
-                    await writer.WriteAsync(kvpData);
-                }
-            }
+            // Convert the URL-encoded data to bytes
+            byte[] formData = Encoding.UTF8.GetBytes(kvpData);
+
+            // Set the request's uploadHandler to send the form data
+            UploadHandlerRaw uploadHandler = new UploadHandlerRaw(formData);
+            uploadHandler.contentType = "application/x-www-form-urlencoded";
+            request.uploadHandler = uploadHandler;
         }
 
-        static async Task SetupMultipartRequest(this WebRequest request, WebRequestConfig config, ProgressHandle progressHandle)
+        static async Task SetupMultipartRequest(this UnityWebRequest request, WebRequestConfig config, ProgressHandle progressHandle)
         {
             string boundary = "---------------------------" + DateTime.Now.Ticks.ToString("x");
 
-            request.ContentType = "multipart/form-data; boundary=" + boundary;
+            request.SetRequestHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
 
             MultipartFormDataContent multipartContent = new MultipartFormDataContent(boundary);
             foreach(var binary in config.BinaryData)
@@ -498,39 +485,42 @@ namespace ModIO.Implementation.API
                 multipartContent.Add(stringField, kvp.Key);
             }
 
-            using (Stream requestStream = request.GetRequestStream())
-            {
-                using (Stream content = await multipartContent.ReadAsStreamAsync())
-                {
-                    int bytesRead;
-                    long totalBytesRead = 0;
-                    long bytesUploadedForThisSample = 0;
-                    Stopwatch stopwatch = new Stopwatch();
-                    stopwatch.Start();
+            request.uploadHandler = new UploadHandlerRaw(await multipartContent.ReadAsByteArrayAsync());
+            request.uploadHandler.contentType = "multipart/form-data; boundary=" + boundary;
 
-                    byte[] buffer = new byte[4096];
-
-                    while((bytesRead = await content.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                    {
-                        await requestStream.WriteAsync(buffer, 0, bytesRead);
-                        totalBytesRead += bytesRead;
-                        if(progressHandle != null)
-                        {
-                            // We make the length 1% longer so it doesnt get to 100% while we wait for the server response
-                            progressHandle.Progress = (float)(totalBytesRead / (content.Length * (decimal)1.01f));
-
-                            bytesUploadedForThisSample += bytesRead;
-                            if(stopwatch.ElapsedMilliseconds >= 1000)
-                            {
-                                progressHandle.BytesPerSecond = bytesUploadedForThisSample;
-                                bytesUploadedForThisSample = 0;
-                                stopwatch.Restart();
-                            }
-                        }
-                    }
-                    stopwatch.Stop();
-                }
-            }
+            // using (Stream requestStream = request.GetRequestStream())
+            // {
+            //     using (Stream content = await multipartContent.ReadAsStreamAsync())
+            //     {
+            //         int bytesRead;
+            //         long totalBytesRead = 0;
+            //         long bytesUploadedForThisSample = 0;
+            //         Stopwatch stopwatch = new Stopwatch();
+            //         stopwatch.Start();
+            //
+            //         byte[] buffer = new byte[4096];
+            //
+            //         while((bytesRead = await content.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            //         {
+            //             await requestStream.WriteAsync(buffer, 0, bytesRead);
+            //             totalBytesRead += bytesRead;
+            //             if(progressHandle != null)
+            //             {
+            //                 // We make the length 1% longer so it doesnt get to 100% while we wait for the server response
+            //                 progressHandle.Progress = (float)(totalBytesRead / (content.Length * (decimal)1.01f));
+            //
+            //                 bytesUploadedForThisSample += bytesRead;
+            //                 if(stopwatch.ElapsedMilliseconds >= 1000)
+            //                 {
+            //                     progressHandle.BytesPerSecond = bytesUploadedForThisSample;
+            //                     bytesUploadedForThisSample = 0;
+            //                     stopwatch.Restart();
+            //                 }
+            //             }
+            //         }
+            //         stopwatch.Stop();
+            //     }
+            // }
         }
 #endregion
 
@@ -658,7 +648,7 @@ namespace ModIO.Implementation.API
             return log;
         }
 
-        static string GenerateLogForRequestMessage(WebRequest request)
+        static string GenerateLogForRequestMessage(UnityWebRequest request)
         {
             if(request == null)
             {
@@ -666,20 +656,20 @@ namespace ModIO.Implementation.API
             }
             string log = "\n\n------------------------";
             string headers = $"\nREQUEST HEADERS";
-            foreach(var key in request.Headers.AllKeys)
+            foreach(var i in request.GetResponseHeaders())
             {
-                if(key == "Authorization")
+                if(i.Key == "Authorization")
                 {
                     headers += $"\nAuthorization: [OAUTHTOKEN]";
                     continue;
                 }
-                headers += $"\n{key}: {request.Headers[key]}";
+                headers += $"\n{i.Key}: {i.Value}";
             }
             log += headers;
             return log;
         }
 
-        static string GenerateLogForResponseMessage(WebResponse response)
+        static string GenerateLogForResponseMessage(UnityWebRequest response)
         {
             if(response == null)
             {
@@ -688,10 +678,11 @@ namespace ModIO.Implementation.API
 
             string log = "\n\n------------------------";
             string headers = $"\nRESPONSE HEADERS";
-            foreach(var key in response.Headers.AllKeys)
-            {
-                headers += $"\n{key}: {response.Headers[key]}";
-            }
+            headers += "not supported";
+            // foreach(var key in response.Headers.AllKeys)
+            // {
+            //     headers += $"\n{key}: {response.Headers[key]}";
+            // }
             log += headers;
             return log;
         }
