@@ -530,7 +530,7 @@ namespace ModIO.Implementation.API
 
 #region Processing Response Body
 
-        public async static Task<ResultAnd<T>> FormatResult<T>(Stream response)
+        public static async Task<ResultAnd<T>> FormatResult<T>(Stream response)
         {
             //int? is used as a nullable type to denote that we are ignoring type in the response
             //ie - some commands are sent without expect any useful response aside from the response code itself
@@ -548,7 +548,7 @@ namespace ModIO.Implementation.API
 
             try
             {
-                T deserialized = await Task.Run(()=> Deserialize<T>(response));
+                T deserialized = Deserialize<T>(response);
                 return ResultAnd.Create(ResultBuilder.Success, deserialized);
             }
             catch(Exception e)
