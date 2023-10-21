@@ -302,6 +302,10 @@ namespace ModIO.Implementation.API
             // Send request
             await request.SendWebRequest();
 
+            if (request.result == UnityWebRequest.Result.Success) {
+                downloadStream.Write(request.downloadHandler.data);
+            }
+
             // // Read response
             // using(Stream responseStream = response.GetResponseStream())
             // {
