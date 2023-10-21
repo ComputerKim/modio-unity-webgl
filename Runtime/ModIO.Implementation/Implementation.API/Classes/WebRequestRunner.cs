@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
+using Debug = UnityEngine.Debug;
 
 namespace ModIO.Implementation.API
 {
@@ -135,7 +136,7 @@ namespace ModIO.Implementation.API
                 }
 
                 request.LogRequestBeingSent(config);
-
+                
                 if (config.IsUpload)
                     await request.GetUploadResponse(config, progressHandle);
                 else
@@ -372,6 +373,7 @@ namespace ModIO.Implementation.API
 
             // Create request
             var request = new UnityWebRequest(config.Url, config.RequestMethodType);
+            request.downloadHandler = new DownloadHandlerBuffer();
             request.SetModioHeaders();
             request.SetConfigHeaders(config);
 
@@ -393,6 +395,7 @@ namespace ModIO.Implementation.API
         {
             // Create request
             var request = new UnityWebRequest(config.Url, config.RequestMethodType);
+            request.downloadHandler = new DownloadHandlerBuffer();
             request.SetModioHeaders();
             request.SetConfigHeaders(config);
 
@@ -414,6 +417,7 @@ namespace ModIO.Implementation.API
 
             // Create request
             var request = new UnityWebRequest(url, "GET");
+            request.downloadHandler = new DownloadHandlerBuffer();
             request.SetModioHeaders();
             request.timeout = -1;
 
