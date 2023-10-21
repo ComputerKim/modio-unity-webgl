@@ -1,4 +1,4 @@
-#if UNITY_STANDALONE || UNITY_ANDROID || UNITY_IOS || (MODIO_COMPILE_ALL && UNITY_EDITOR) || UNITY_WSA || !UNITY_2019_4_OR_NEWER
+#if !UNITY_EDITOR
 
 using System;
 using System.Collections.Generic;
