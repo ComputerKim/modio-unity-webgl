@@ -209,7 +209,7 @@ namespace ModIO.Implementation.API
         {
             string log = $"\n{config.Url}"
                          + $"\nMETHOD: {config.RequestMethodType}"
-                         + $"\n{GenerateLogForRequestMessage(request)}"
+                         + $"\n{GenerateLogForRequestMessage(config)}"
                          + $"\n{GenerateLogForWebRequestConfig(config)}";
             Logger.Log(LogLevel.Verbose, $"SENDING{log}");
         }
@@ -218,7 +218,7 @@ namespace ModIO.Implementation.API
         {
             string log = $"\n{config.Url}"
                          + $"\nMETHOD: {config.RequestMethodType}"
-                         + $"\n{GenerateLogForRequestMessage(request)}"
+                         + $"\n{GenerateLogForRequestMessage(config)}"
                          + $"\n{GenerateLogForWebRequestConfig(config)}";
             Logger.Log(LogLevel.Verbose, $"ABORTED{log}");
         }
@@ -239,7 +239,7 @@ namespace ModIO.Implementation.API
             string completeRequestLog = $"{GenerateLogForStatusCode(statusCode)}"
                                         + $"\n{url}"
                                         + $"\nMETHOD: GET"
-                                        + $"\n{GenerateLogForRequestMessage(request)}"
+                                        + $"\n{GenerateLogForRequestMessage(null)}"
                                         + $"\n{GenerateLogForResponseMessage(request)}";
 
             if(IsSuccessStatusCode(statusCode))
@@ -274,7 +274,7 @@ namespace ModIO.Implementation.API
             string completeRequestLog = $"{GenerateLogForStatusCode(statusCode)}"
                                         + $"\n{config.Url}"
                                         + $"\nMETHOD: {config.RequestMethodType}"
-                                        + $"\n{GenerateLogForRequestMessage(request)}"
+                                        + $"\n{GenerateLogForRequestMessage(config)}"
                                         + $"\n{GenerateLogForWebRequestConfig(config)}"
                                         + $"\n{GenerateLogForResponseMessage(request)}";
 
@@ -435,7 +435,7 @@ namespace ModIO.Implementation.API
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("User-Agent", $"unity-{Application.unityVersion}-{ModIOVersion.Current.ToHeaderString()}");
             // Cloudflare reuses open TCP connections for up to 15 minutes (900 seconds) after the last HTTP request
-            request.SetRequestHeader("Connection", "keep-alive");
+            // request.SetRequestHeader("Connection", "keep-alive");
             request.SetRequestHeader(ServerConstants.HeaderKeys.LANGUAGE, Settings.server.languageCode ?? "en");
             request.SetRequestHeader(ServerConstants.HeaderKeys.PLATFORM, PlatformConfiguration.RESTAPI_HEADER);
             request.SetRequestHeader(ServerConstants.HeaderKeys.PORTAL, ServerConstants.ConvertUserPortalToHeaderValue(Settings.build.userPortal));
@@ -648,15 +648,15 @@ namespace ModIO.Implementation.API
             return log;
         }
 
-        static string GenerateLogForRequestMessage(UnityWebRequest request)
+        static string GenerateLogForRequestMessage(WebRequestConfig config)
         {
-            if(request == null)
+            if(config == null)
             {
                 return "\n\n------------------------ \nWebRequest is null";
             }
             string log = "\n\n------------------------";
             string headers = $"\nREQUEST HEADERS";
-            foreach(var i in request.GetResponseHeaders())
+            foreach(var i in config.HeaderData)
             {
                 if(i.Key == "Authorization")
                 {
@@ -678,11 +678,10 @@ namespace ModIO.Implementation.API
 
             string log = "\n\n------------------------";
             string headers = $"\nRESPONSE HEADERS";
-            headers += "not supported";
-            // foreach(var key in response.Headers.AllKeys)
-            // {
-            //     headers += $"\n{key}: {response.Headers[key]}";
-            // }
+            foreach(var i in response.GetResponseHeaders())
+            {
+                headers += $"\n{i.Key}: {i.Value}";
+            }
             log += headers;
             return log;
         }
