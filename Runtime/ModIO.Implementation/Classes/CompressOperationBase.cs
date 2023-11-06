@@ -49,7 +49,7 @@ namespace ModIO.Implementation
                 int size = fileStream.Read(data, 0, data.Length);
                 if(size > 0)
                 {
-                    await zipStream.WriteAsync(data, 0, size);
+                    zipStream.Write(data, 0, size);
                     if(progressHandle != null)
                     {
                         // This is only the progress for the current entry

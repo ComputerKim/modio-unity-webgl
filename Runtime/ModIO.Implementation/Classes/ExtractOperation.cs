@@ -99,10 +99,10 @@ namespace ModIO.Implementation
                                                 // on another thread (consider testing this on larger
                                                 // mods, eg 5 GiB size mods)
 
-                                                size = await stream.ReadAsync(data, 0, data.Length);
+                                                size = stream.Read(data, 0, data.Length);
                                                 if(size > 0)
                                                 {
-                                                    await streamWriter.WriteAsync(data, 0, size);
+                                                    streamWriter.Write(data, 0, size);
                                                     if(progressHandle != null)
                                                     {
                                                         // This is only the progress for the current

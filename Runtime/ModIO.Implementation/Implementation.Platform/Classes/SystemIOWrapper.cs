@@ -108,7 +108,7 @@ namespace ModIO.Implementation.Platform
                     using(var sourceStream = File.Open(filePath, FileMode.Open))
                     {
                         data = new byte[sourceStream.Length];
-                        var pos = await sourceStream.ReadAsync(data, 0, (int)sourceStream.Length);
+                        var pos = sourceStream.Read(data, 0, (int)sourceStream.Length);
                     }
 
                     result = ResultBuilder.Success;
@@ -211,7 +211,7 @@ namespace ModIO.Implementation.Platform
                     using(var fileStream = File.Open(filePath, FileMode.Create))
                     {
                         fileStream.Position = 0;
-                        await fileStream.WriteAsync(data, 0, data.Length);
+                        fileStream.Write(data, 0, data.Length);
                     }
 
                     result = ResultBuilder.Success;

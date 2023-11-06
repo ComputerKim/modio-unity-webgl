@@ -28,7 +28,7 @@ namespace ModIO.Implementation.Platform
         public static string RESTAPI_HEADER = RestApiPlatform.Ios.ToString();
 #else 
         /// <summary>Holds the value for the platform header value to use in requests.</summary>
-        public static string RESTAPI_HEADER = RestApiPlatform.Source.ToString();
+        public static string RESTAPI_HEADER = RestApiPlatform.Windows.ToString();
 #endif
         public const bool SynchronizedDataJobs = false;
 

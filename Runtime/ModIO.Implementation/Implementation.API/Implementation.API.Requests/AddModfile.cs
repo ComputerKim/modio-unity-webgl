@@ -19,7 +19,7 @@ namespace ModIO.Implementation.API.Requests
 
             stream.Position = 0;
             var result = new byte[stream.Length];
-            var pos = await stream.ReadAsync(result, 0, (int)stream.Length, new CancellationToken());
+            var pos = stream.Read(result, 0, (int)stream.Length);
 
             request.AddField("version", details.version);
             request.AddField("changelog", details.changelog);

@@ -349,7 +349,6 @@ namespace ModIO.Implementation.Platform
             // InvalidOperationException
             //  The stream is currently in use by a previous read operation.
 
-            await Task.Yield();
             return this.fileStream.Read(buffer, offset, count);
         }
 
@@ -363,7 +362,6 @@ namespace ModIO.Implementation.Platform
             {
                 try
                 {
-                    await Task.Yield();
                     data = new byte[this.fileStream.Length];
                     this.fileStream.Read(data, 0, (int)this.fileStream.Length);
 
@@ -558,7 +556,7 @@ namespace ModIO.Implementation.Platform
         ///
         /// For an example, see the WriteAsync(Byte[], Int32, Int32) overload.
         /// </remarks>
-        public override Task WriteAsync(byte[] buffer, int offset, int count,
+        public override async Task WriteAsync(byte[] buffer, int offset, int count,
                                         CancellationToken cancellationToken)
         {
             // Exceptions
@@ -574,8 +572,8 @@ namespace ModIO.Implementation.Platform
             //  The stream has been disposed.
             // InvalidOperationException
             //  The stream is currently in use by a previous write operation.
-
-            return this.fileStream.WriteAsync(buffer, offset, count, cancellationToken);
+            await Task.Yield();
+            this.fileStream.Write(buffer, offset, count);
         }
 
         public override async Task<Result> WriteAllBytesAsync(byte[] buffer)
@@ -588,7 +586,7 @@ namespace ModIO.Implementation.Platform
                 try
                 {
                     fileStream.Position = 0;
-                    await fileStream.WriteAsync(buffer, 0, buffer.Length);
+                    fileStream.Write(buffer, 0, buffer.Length);
 
                     writeResult = ResultBuilder.Success;
                 }
