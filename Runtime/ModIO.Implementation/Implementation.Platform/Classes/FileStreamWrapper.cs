@@ -332,7 +332,7 @@ namespace ModIO.Implementation.Platform
         ///
         /// For an example, see the ReadAsync(Byte[], Int32, Int32) overload.
         /// </remarks>
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count,
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count,
                                             CancellationToken cancellationToken)
         {
             // Exceptions
@@ -349,7 +349,8 @@ namespace ModIO.Implementation.Platform
             // InvalidOperationException
             //  The stream is currently in use by a previous read operation.
 
-            return this.fileStream.ReadAsync(buffer, offset, count, cancellationToken);
+            await Task.Yield();
+            return this.fileStream.Read(buffer, offset, count);
         }
 
         public override async Task<ResultAnd<byte[]>> ReadAllBytesAsync()
@@ -362,8 +363,9 @@ namespace ModIO.Implementation.Platform
             {
                 try
                 {
+                    await Task.Yield();
                     data = new byte[this.fileStream.Length];
-                    await this.fileStream.ReadAsync(data, 0, (int)this.fileStream.Length);
+                    this.fileStream.Read(data, 0, (int)this.fileStream.Length);
 
                     readResult = ResultBuilder.Success;
                 }

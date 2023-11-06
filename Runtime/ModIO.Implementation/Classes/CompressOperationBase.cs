@@ -45,7 +45,8 @@ namespace ModIO.Implementation
             {
                 // TODO @Jackson ensure ReadAsync and WriteAsync are
                 // implemented on all filestream wrappers
-                int size = await fileStream.ReadAsync(data, 0, data.Length);
+                await Task.Yield();
+                int size = fileStream.Read(data, 0, data.Length);
                 if(size > 0)
                 {
                     await zipStream.WriteAsync(data, 0, size);
