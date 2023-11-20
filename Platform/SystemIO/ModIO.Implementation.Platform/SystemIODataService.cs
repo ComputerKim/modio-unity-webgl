@@ -262,6 +262,8 @@ namespace ModIO.Implementation.Platform
                 var statFs = new AndroidJavaObject("android.os.StatFs", persistentDataPath);
                 var freeBytes = statFs.Call<long>("getFreeBytes");
                 return bytes < freeBytes;
+#elif UNITY_WEBGL
+                return true;
 #else
                 FileInfo f = new FileInfo(PersistentDataRootDirectory);
                 string drive = Path.GetPathRoot(f.FullName);
