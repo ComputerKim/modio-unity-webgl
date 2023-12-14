@@ -352,33 +352,33 @@ namespace ModIO.Implementation.Platform
             return this.fileStream.Read(buffer, offset, count);
         }
 
-        public override async Task<ResultAnd<byte[]>> ReadAllBytesAsync()
-        {
-            Result readResult;
-            byte[] data = null;
-
-            if(SystemIOWrapper.IsPathValid(this.fileStream.Name, out readResult)
-               && SystemIOWrapper.DoesFileExist(this.fileStream.Name, out readResult))
-            {
-                try
-                {
-                    data = new byte[this.fileStream.Length];
-                    this.fileStream.Read(data, 0, (int)this.fileStream.Length);
-
-                    readResult = ResultBuilder.Success;
-                }
-                catch(Exception e) // TODO(@jackson): Handle exceptions
-                {
-                    Logger.Log(LogLevel.Warning, "Unhandled error when attempting to read the file."
-                                                     + $"\n.path={this.fileStream.Name}"
-                                                     + $"\n.Exception:{e.Message}");
-
-                    readResult = ResultBuilder.Create(ResultCode.IO_FileCouldNotBeRead);
-                }
-            }
-
-            return ResultAnd.Create(readResult, data);
-        }
+        // public override async Task<ResultAnd<byte[]>> ReadAllBytesAsync()
+        // {
+        //     Result readResult;
+        //     byte[] data = null;
+        //
+        //     if(SystemIOWrapper.IsPathValid(this.fileStream.Name, out readResult)
+        //        && SystemIOWrapper.DoesFileExist(this.fileStream.Name, out readResult))
+        //     {
+        //         try
+        //         {
+        //             data = new byte[this.fileStream.Length];
+        //             this.fileStream.Read(data, 0, (int)this.fileStream.Length);
+        //
+        //             readResult = ResultBuilder.Success;
+        //         }
+        //         catch(Exception e) // TODO(@jackson): Handle exceptions
+        //         {
+        //             Logger.Log(LogLevel.Warning, "Unhandled error when attempting to read the file."
+        //                                              + $"\n.path={this.fileStream.Name}"
+        //                                              + $"\n.Exception:{e.Message}");
+        //
+        //             readResult = ResultBuilder.Create(ResultCode.IO_FileCouldNotBeRead);
+        //         }
+        //     }
+        //
+        //     return ResultAnd.Create(readResult, data);
+        // }
 
         public override ResultAnd<byte[]> ReadAllBytes()
         {
@@ -576,36 +576,36 @@ namespace ModIO.Implementation.Platform
             this.fileStream.Write(buffer, offset, count);
         }
 
-        public override async Task<Result> WriteAllBytesAsync(byte[] buffer)
-        {
-            Result writeResult;
-
-            if(SystemIOWrapper.IsPathValid(this.fileStream.Name, out writeResult)
-               && SystemIOWrapper.TryCreateParentDirectory(this.fileStream.Name, out writeResult))
-            {
-                try
-                {
-                    fileStream.Position = 0;
-                    fileStream.Write(buffer, 0, buffer.Length);
-
-                    writeResult = ResultBuilder.Success;
-                }
-                catch(Exception e)
-                {
-                    Logger.Log(LogLevel.Warning,
-                               "Unhandled error when attempting to write the file."
-                                   + $"\n.path={this.fileStream.Name}"
-                                   + $"\n.Exception:{e.Message}");
-
-                    writeResult = ResultBuilder.Create(ResultCode.IO_FileCouldNotBeWritten);
-                }
-            }
-
-            Logger.Log(LogLevel.Verbose,
-                       $"Write file: {this.fileStream.Name} - Result: [{writeResult.code}]");
-
-            return writeResult;
-        }
+        // public override async Task<Result> WriteAllBytesAsync(byte[] buffer)
+        // {
+        //     Result writeResult;
+        //
+        //     if(SystemIOWrapper.IsPathValid(this.fileStream.Name, out writeResult)
+        //        && SystemIOWrapper.TryCreateParentDirectory(this.fileStream.Name, out writeResult))
+        //     {
+        //         try
+        //         {
+        //             fileStream.Position = 0;
+        //             fileStream.Write(buffer, 0, buffer.Length);
+        //
+        //             writeResult = ResultBuilder.Success;
+        //         }
+        //         catch(Exception e)
+        //         {
+        //             Logger.Log(LogLevel.Warning,
+        //                        "Unhandled error when attempting to write the file."
+        //                            + $"\n.path={this.fileStream.Name}"
+        //                            + $"\n.Exception:{e.Message}");
+        //
+        //             writeResult = ResultBuilder.Create(ResultCode.IO_FileCouldNotBeWritten);
+        //         }
+        //     }
+        //
+        //     Logger.Log(LogLevel.Verbose,
+        //                $"Write file: {this.fileStream.Name} - Result: [{writeResult.code}]");
+        //
+        //     return writeResult;
+        // }
 
         public override Result WriteAllBytes(byte[] buffer)
         {

@@ -26,11 +26,7 @@ namespace ModIO.Implementation
             this.progressHandle = progressHandle;
         }
 
-        public async Task<Result> Extract()
-        {
-            return await DataStorage.taskRunner.AddTask(TaskPriority.HIGH, 1,
-                async () => await ExtractAll(), true);
-        }
+        public async Task<Result> Extract() => await ExtractAll();
 
         // ---------[ Interface ]---------
         /// <summary>Extracts the contents of an archive.</summary>

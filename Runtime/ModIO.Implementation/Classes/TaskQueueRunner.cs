@@ -202,14 +202,14 @@ namespace ModIO.Implementation
 
                     try
                     {
-                        if(item.useSeparateThread)
+                        // if(item.useSeparateThread)
+                        // {
+                        //     await Task.Run(() => item.task.Start());
+                        // }
+                        // else
                         {
-                            await Task.Run(() => item.task.Start());
-                        }
-                        else
-                        {
-                            item.task.Start();
-                            item.task.Wait();
+                            // item.task.Start();
+                            // item.task.Wait();
                             await item.task;
                         }
                     }
@@ -233,13 +233,13 @@ namespace ModIO.Implementation
 
                     try
                     {
-                        if(item.useSeparateThread)
+                        // if(item.useSeparateThread)
+                        // {
+                        //     await Task.Run(() => item.task.Start());
+                        // }
+                        // else
                         {
-                            await Task.Run(() => item.task.Start());
-                        }
-                        else
-                        {
-                            item.task.Start();
+                            // item.task.Start();
                         }
                     }
                     catch(Exception e)

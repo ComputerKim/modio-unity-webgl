@@ -1755,7 +1755,7 @@ namespace ModIO.Implementation
                                 {
                                     using (openReadStream.value)
                                     {
-                                        var readAllBytes = await openReadStream.value.ReadAllBytesAsync();
+                                        var readAllBytes = openReadStream.value.ReadAllBytes();
                                         result = readAllBytes.result;
 
                                         if(result.Succeeded())

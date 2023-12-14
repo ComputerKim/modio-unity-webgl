@@ -105,12 +105,12 @@ namespace ModIO.Implementation.Platform
             {
                 try
                 {
-                    using(var sourceStream = File.Open(filePath, FileMode.Open))
-                    {
-                        data = new byte[sourceStream.Length];
-                        var pos = sourceStream.Read(data, 0, (int)sourceStream.Length);
-                    }
-
+                    // using(var sourceStream = File.Open(filePath, FileMode.Open))
+                    // {
+                    //     data = new byte[sourceStream.Length];
+                    //     var pos = sourceStream.Read(data, 0, (int)sourceStream.Length);
+                    // }
+                    data = File.ReadAllBytes(filePath);
                     result = ResultBuilder.Success;
                 }
                 catch(Exception e) // TODO(@jackson): Handle UnauthorizedAccessException

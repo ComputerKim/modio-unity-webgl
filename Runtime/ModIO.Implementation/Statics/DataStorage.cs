@@ -146,8 +146,7 @@ namespace ModIO.Implementation
             }
 
             // - read -
-            ResultAnd<byte[]> readResult = await taskRunner.AddTask(TaskPriority.HIGH, 1,
-                async () => await temp.ReadFileAsync(filePath));
+            ResultAnd<byte[]> readResult = await temp.ReadFileAsync(filePath);
 
             if(!readResult.result.Succeeded())
             {
@@ -326,8 +325,7 @@ namespace ModIO.Implementation
             string filePath = GenerateSystemRegistryFilePath();
             byte[] data = IOUtil.GenerateUTF8JSONData(registry);
 
-            return await taskRunner.AddTask(TaskPriority.HIGH, 1,
-                async () => await persistent.WriteFileAsync(filePath, data));
+            return await persistent.WriteFileAsync(filePath, data);
         }
 
         /// <summary>Reads the ModCollectionRegistry from disk.</summary>
